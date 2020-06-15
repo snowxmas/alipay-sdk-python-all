@@ -139,7 +139,7 @@ class DefaultAlipayClient(object):
     """
     内部方法，解析请求返回结果并做验签
     """
-    def __parse_response(self, response_str):
+    def parse_response(self, response_str):
         if PYTHON_VERSION_3:
             response_str = response_str.decode(self.__config.charset)
         if THREAD_LOCAL.logger:
@@ -196,11 +196,19 @@ class DefaultAlipayClient(object):
         return response_content
 
 
+    @property
+    def config( self ):
+        return self.__config
+
+
     """
-    执行接口请求
+    获取请求所需的头部以及参数
+    :param request: 请求数据对象
+    :return: 头部、签名信息、请求参数、文件上传对象
     """
-    def execute(self, request):
-        THREAD_LOCAL.uuid = str(uuid.uuid1())
+    def prepare_request( self, request ):
+
+        THREAD_LOCAL.uuid = str( uuid.uuid1() )
         headers = {
             'Content-type': 'application/x-www-form-urlencoded;charset=' + self.__config.charset,
             "Cache-Control": "no-cache",
@@ -209,8 +217,16 @@ class DefaultAlipayClient(object):
             "log-uuid": THREAD_LOCAL.uuid,
         }
 
-        query_string, params = self.__prepare_request(request)
+        query_string, params = self.__prepare_request( request )
         multipart_params = request.get_multipart_params()
+        return ( headers, query_string, params, multipart_params )
+
+
+    """
+    执行接口请求
+    """
+    def execute(self, request):
+        ( headers, query_string, params, multipart_params ) = self.prepare_request( request )
 
         if multipart_params and len(multipart_params) > 0:
             response = do_multipart_post(self.__config.server_url, query_string, headers, params, multipart_params,
@@ -219,7 +235,7 @@ class DefaultAlipayClient(object):
             response = do_post(self.__config.server_url, query_string, headers, params, self.__config.charset,
                                self.__config.timeout)
 
-        return self.__parse_response(response)
+        return self.parse_response(response)
 
     '''
     得到页面跳转接口的url或表单html
